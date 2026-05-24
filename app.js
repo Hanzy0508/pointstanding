@@ -4,9 +4,13 @@
 const RANK_POINTS = {1:12,2:9,3:8,4:7,5:6,6:5,7:4,8:3,9:2,10:1,11:0,12:0};
 const MAX_MATCHES = 6;
 const MIN_MATCHES = 3;
-const SLOTS_PER_MATCH = 2; // slot A (wajib) dan slot B (opsional)
+const SLOTS_PER_MATCH = 2;
 
-// matchData[matchIdx][slotIdx] = { file, preview }
+// OCR library wajib
+// Tambahkan ini di HTML sebelum </body>
+//
+// <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+
 const matchData = Array.from({length: MAX_MATCHES}, () => [null, null]);
 
 // ============================================================
@@ -18,6 +22,7 @@ function buildMatchGrid() {
 
   for (let m = 0; m < MAX_MATCHES; m++) {
     const isRequired = m < MIN_MATCHES;
+
     const block = document.createElement('div');
     block.className = 'match-block';
     block.id = `block-${m}`;
@@ -29,13 +34,17 @@ function buildMatchGrid() {
       <div class="match-block-title">
         <span class="${dotClass}"></span>
         MATCH ${m + 1}
-        <span style="font-size:8px;color:${isRequired ? '#3a7bd5' : '#2a3a5a'}">${label}</span>
+        <span style="font-size:8px;color:${isRequired ? '#3a7bd5' : '#2a3a5a'}">
+          ${label}
+        </span>
       </div>
       <div class="slot-row" id="slots-${m}"></div>
     `;
+
     grid.appendChild(block);
 
     const slotRow = block.querySelector(`#slots-${m}`);
+
     for (let s = 0; s < SLOTS_PER_MATCH; s++) {
       slotRow.appendChild(createSlot(m, s));
     }
@@ -43,7 +52,9 @@ function buildMatchGrid() {
 }
 
 function createSlot(m, s) {
+
   const wrapper = document.createElement('div');
+
   wrapper.className = 'match-slot';
   wrapper.id = `slot-${m}-${s}`;
   wrapper.onclick = () => triggerInput(m, s);
@@ -59,7 +70,10 @@ function createSlot(m, s) {
     <input type="file" id="file-${m}-${s}" accept="image/*">
   `;
 
-  wrapper.querySelector('input').addEventListener('change', (e) => handleFile(e, m, s));
+  wrapper
+    .querySelector('input')
+    .addEventListener('change', (e) => handleFile(e, m, s));
+
   return wrapper;
 }
 
@@ -68,6 +82,475 @@ function triggerInput(m, s) {
 }
 
 // ============================================================
+// FILE HANDLING
+// ============================================================
+function handleFile(e, m, s) {
+
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+
+  reader.onload = (ev) => {
+
+    matchData[m][s] = {
+      file,
+      preview: ev.target.result
+    };
+
+    renderSlot(m, s);
+    updateStatus();
+  };
+
+  reader.readAsDataURL(file);
+}
+
+function renderSlot(m, s) {
+
+  const slot = document.getElementById(`slot-${m}-${s}`);
+  const data = matchData[m][s];
+
+  const optLabel = s === 1
+    ? '<span class="slot-opt-badge">opsional</span>'
+    : '';
+
+  if (data && data.preview) {
+
+    slot.className = 'match-slot has-image';
+
+    slot.innerHTML = `
+      <img class="slot-preview" src="${data.preview}">
+      
+      <div class="slot-overlay">
+        <button class="remove-btn"
+          onclick="removeSlot(event,${m},${s})">
+          ✕ Hapus
+        </button>
+      </div>
+
+      ${optLabel}
+
+      <input type="file" id="file-${m}-${s}" accept="image/*">
+    `;
+
+    slot
+      .querySelector('input')
+      .addEventListener('change', (e) => handleFile(e, m, s));
+
+    slot.onclick = (e) => {
+      if (!e.target.closest('.slot-overlay')) {
+        triggerInput(m, s);
+      }
+    };
+
+  } else {
+
+    const newSlot = createSlot(m, s);
+    slot.replaceWith(newSlot);
+  }
+}
+
+function removeSlot(e, m, s) {
+
+  e.stopPropagation();
+
+  matchData[m][s] = null;
+
+  const slot = document.getElementById(`slot-${m}-${s}`);
+  const newSlot = createSlot(m, s);
+
+  slot.replaceWith(newSlot);
+
+  updateStatus();
+}
+
+// ============================================================
+// STATUS
+// ============================================================
+function getActiveMatches() {
+
+  return matchData
+    .map((slots, idx) => ({
+      idx,
+      slotA: slots[0],
+      slotB: slots[1]
+    }))
+    .filter(m => m.slotA !== null);
+}
+
+function updateStatus() {
+
+  const active = getActiveMatches().length;
+
+  document.getElementById('matchCountInfo').textContent =
+    `${active} match diupload (min. ${MIN_MATCHES})`;
+
+  document.getElementById('btnCalculate').disabled =
+    active < MIN_MATCHES;
+}
+
+// ============================================================
+// TOAST / LOADING
+// ============================================================
+function showToast(msg, dur = 5000) {
+
+  const t = document.getElementById('toast');
+
+  t.textContent = msg;
+  t.classList.add('visible');
+
+  setTimeout(() => {
+    t.classList.remove('visible');
+  }, dur);
+}
+
+function setStep(msg) {
+  document.getElementById('loadingStep').textContent = msg;
+}
+
+function showLoading(show) {
+  document
+    .getElementById('loadingOverlay')
+    .classList
+    .toggle('active', show);
+}
+
+// ============================================================
+// OCR MATCH
+// ============================================================
+async function extractMatch(matchIdx, slotA, slotB, captains) {
+
+  function normalize(txt) {
+    return txt
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, '');
+  }
+
+  function similarity(a, b) {
+
+    a = normalize(a);
+    b = normalize(b);
+
+    if (!a || !b) return 0;
+
+    let same = 0;
+
+    for (let i = 0; i < Math.min(a.length, b.length); i++) {
+      if (a[i] === b[i]) same++;
+    }
+
+    return same / Math.max(a.length, b.length);
+  }
+
+  async function readImage(file) {
+
+    const result = await Tesseract.recognize(
+      file,
+      'eng',
+      {
+        logger: m => {
+          console.log(m);
+          if (m.status) {
+            setStep(`${m.status} ${Math.floor(m.progress * 100)}%`);
+          }
+        }
+      }
+    );
+
+    return result.data.text || '';
+  }
+
+  // ============================================================
+  // OCR
+  // ============================================================
+
+  let fullText = '';
+
+  const textA = await readImage(slotA.file);
+  fullText += '\n' + textA;
+
+  if (slotB) {
+    const textB = await readImage(slotB.file);
+    fullText += '\n' + textB;
+  }
+
+  console.log('OCR RESULT:', fullText);
+
+  const lines = fullText
+    .split('\n')
+    .map(v => v.trim())
+    .filter(Boolean);
+
+  // ============================================================
+  // PROCESS CAPTAIN
+  // ============================================================
+
+  const results = [];
+
+  captains.forEach(cap => {
+
+    let bestLine = null;
+    let bestScore = 0;
+
+    for (const line of lines) {
+
+      const score = similarity(cap, line);
+
+      if (score > bestScore) {
+        bestScore = score;
+        bestLine = line;
+      }
+    }
+
+    // Tidak ditemukan
+    if (bestScore < 0.45) {
+
+      results.push({
+        captain: cap,
+        rank: 0,
+        kills: 0,
+        found: false
+      });
+
+      return;
+    }
+
+    // ============================================================
+    // DETEKSI RANK
+    // ============================================================
+
+    let rank = 0;
+
+    const aroundText = lines.join(' ').toLowerCase();
+
+    for (let i = 1; i <= 12; i++) {
+
+      const patterns = [
+        `#${i}`,
+        ` ${i} `,
+        `rank ${i}`,
+        `pos ${i}`
+      ];
+
+      if (patterns.some(p => aroundText.includes(p))) {
+        rank = i;
+        break;
+      }
+    }
+
+    // ============================================================
+    // DETEKSI KILL
+    // ============================================================
+
+    let kills = 0;
+
+    const nums = bestLine.match(/\d+/g);
+
+    if (nums && nums.length) {
+      kills = parseInt(nums[nums.length - 1]) || 0;
+    }
+
+    results.push({
+      captain: cap,
+      rank,
+      kills,
+      found: true
+    });
+  });
+
+  return {
+    match: matchIdx + 1,
+    results
+  };
+}
+
+// ============================================================
+// MAIN CALCULATE
+// ============================================================
+async function calculate() {
+
+  const ftName =
+    document.getElementById('ftName').value.trim();
+
+  const capRaw =
+    document.getElementById('captainNames').value.trim();
+
+  if (!ftName) {
+    showToast('Nama FT wajib diisi!');
+    return;
+  }
+
+  if (!capRaw) {
+    showToast('Nama kapten wajib diisi!');
+    return;
+  }
+
+  const captains = capRaw
+    .split(/[\n,]+/)
+    .map(s => s.trim())
+    .filter(Boolean);
+
+  if (!captains.length) {
+    showToast('Masukkan minimal 1 nama kapten!');
+    return;
+  }
+
+  const activeMatches = getActiveMatches();
+
+  if (activeMatches.length < MIN_MATCHES) {
+
+    showToast(
+      `Upload minimal ${MIN_MATCHES} foto Match!`
+    );
+
+    return;
+  }
+
+  showLoading(true);
+
+  const allResults = [];
+
+  try {
+
+    for (let i = 0; i < activeMatches.length; i++) {
+
+      const {
+        idx,
+        slotA,
+        slotB
+      } = activeMatches[i];
+
+      setStep(
+        `Membaca Match ${idx + 1}...`
+      );
+
+      const result = await extractMatch(
+        idx,
+        slotA,
+        slotB,
+        captains
+      );
+
+      allResults.push(result);
+
+      setStep(
+        `Match ${idx + 1} selesai ✓`
+      );
+
+      await new Promise(r => setTimeout(r, 300));
+    }
+
+    setStep('Menghitung standings...');
+
+    buildStandings(
+      captains,
+      allResults,
+      ftName,
+      activeMatches.length
+    );
+
+  } catch (err) {
+
+    console.error(err);
+
+    showToast(
+      'Error: ' + err.message,
+      7000
+    );
+
+  } finally {
+
+    showLoading(false);
+  }
+}
+
+// ============================================================
+// BUILD STANDINGS
+// ============================================================
+function buildStandings(captains, allResults, ftName, matchCount) {
+
+  const stats = {};
+
+  captains.forEach(cap => {
+
+    stats[cap] = {
+      captain: cap,
+      booyah: 0,
+      totalKills: 0,
+      stPoints: 0,
+      matches: []
+    };
+  });
+
+  allResults.forEach(matchResult => {
+
+    matchResult.results.forEach(r => {
+
+      const s = stats[r.captain];
+      if (!s) return;
+
+      const rp = RANK_POINTS[r.rank] || 0;
+
+      s.totalKills += r.kills;
+      s.stPoints += rp;
+
+      if (r.rank === 1) s.booyah++;
+
+      s.matches.push({
+        match: matchResult.match,
+        rank: r.rank,
+        kills: r.kills,
+        found: r.found,
+        rankPts: rp
+      });
+    });
+  });
+
+  const rows = captains.map(cap => {
+
+    const s = stats[cap];
+
+    s.totalPts =
+      s.stPoints + s.totalKills;
+
+    return s;
+  });
+
+  rows.sort((a, b) => {
+
+    if (b.totalPts !== a.totalPts)
+      return b.totalPts - a.totalPts;
+
+    if (b.booyah !== a.booyah)
+      return b.booyah - a.booyah;
+
+    return b.totalKills - a.totalKills;
+  });
+
+  renderStandings(
+    rows,
+    ftName,
+    matchCount,
+    allResults
+  );
+}
+
+// ============================================================
+// ESCAPE
+// ============================================================
+function esc(s) {
+
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+// ============================================================
+// INIT
+// ============================================================
+buildMatchGrid();
+updateStatus();// ============================================================
 // FILE HANDLING
 // ============================================================
 function handleFile(e, m, s) {
