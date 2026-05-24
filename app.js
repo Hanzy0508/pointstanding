@@ -211,10 +211,14 @@ Format wajib:
   parts.push({ text: prompt });
 
   const resp = await fetch('/api/claude', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ parts })
-  });
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    imageBase64: imageContent
+  })
+});
 
   if (!resp.ok) {
     const err = await resp.text();
