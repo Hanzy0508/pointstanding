@@ -10,7 +10,7 @@ export default async function handler(req, res) {
 
   // Nama ENV bebas, contoh:
   // DEEPSEEK_API_KEY = sk-xxxxxxxx
-  const apiKey = process.env.sk-a06d78c9841f4c38983b8d16452ec912;
+  const apiKey = "sk-a06d78c9841f4c38983b8d16452ec912";
 
   if (!apiKey) {
     return res.status(500).json({
