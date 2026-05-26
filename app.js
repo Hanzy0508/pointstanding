@@ -1,244 +1,423 @@
-// Poin system
-const RANK_POINTS = {
-    1: 12, 2: 9, 3: 8, 4: 7, 5: 6,
-    6: 5, 7: 4, 8: 3, 9: 2, 10: 1,
-    11: 0, 12: 0
-};
+// ============================================================
+// CONFIG
+// ============================================================
+const RANK_POINTS = {1:12,2:9,3:8,4:7,5:6,6:5,7:4,8:3,9:2,10:1,11:0,12:0};
+const MAX_MATCHES = 6;
+const MIN_MATCHES = 3;
+const SLOTS_PER_MATCH = 2; // slot A (wajib) dan slot B (opsional)
 
-let tournamentData = {
-    ftName: '',
-    captains: [],
-    matches: {}
-};
+// matchData[matchIdx][slotIdx] = { file, preview }
+const matchData = Array.from({length: MAX_MATCHES}, () => [null, null]);
 
-// DOM Elements
-document.getElementById('calculateBtn').addEventListener('click', calculateStandings);
-document.getElementById('showBreakdownBtn')?.addEventListener('click', showBreakdown);
-document.querySelector('.close')?.addEventListener('click', () => {
-    document.getElementById('breakdownModal').classList.add('hidden');
-});
+// ============================================================
+// BUILD GRID
+// ============================================================
+function buildMatchGrid() {
+  const grid = document.getElementById('matchGrid');
+  grid.innerHTML = '';
 
-async function calculateStandings() {
-    // Get FT Name
-    tournamentData.ftName = document.getElementById('ftName').value || 'Unknown FT';
-    
-    // Get captains list
-    const captainsInput = document.getElementById('captains').value;
-    tournamentData.captains = captainsInput.split(/[,\n]/).map(c => c.trim()).filter(c => c);
-    
-    if (tournamentData.captains.length === 0) {
-        alert('Masukkan nama kapten tim!');
-        return;
+  for (let m = 0; m < MAX_MATCHES; m++) {
+    const isRequired = m < MIN_MATCHES;
+    const block = document.createElement('div');
+    block.className = 'match-block';
+    block.id = `block-${m}`;
+
+    const dotClass = isRequired ? 'req-dot' : 'opt-dot';
+    const label = isRequired ? 'Wajib' : 'Opsional';
+
+    block.innerHTML = `
+      <div class="match-block-title">
+        <span class="${dotClass}"></span>
+        MATCH ${m + 1}
+        <span style="font-size:8px;color:${isRequired ? '#3a7bd5' : '#2a3a5a'}">${label}</span>
+      </div>
+      <div class="slot-row" id="slots-${m}"></div>
+    `;
+    grid.appendChild(block);
+
+    const slotRow = block.querySelector(`#slots-${m}`);
+    for (let s = 0; s < SLOTS_PER_MATCH; s++) {
+      slotRow.appendChild(createSlot(m, s));
     }
-    
-    // Collect images
-    const matches = {};
-    for (let match = 1; match <= 6; match++) {
-        const leftInput = document.querySelector(`.match-left[data-match="${match}"]`);
-        const rightInput = document.querySelector(`.match-right[data-match="${match}"]`);
-        
-        if (leftInput && leftInput.files[0] && rightInput && rightInput.files[0]) {
-            matches[match] = {
-                left: leftInput.files[0],
-                right: rightInput.files[0]
-            };
-        } else if (match <= 3 && (!leftInput?.files[0] || !rightInput?.files[0])) {
-            alert(`Match ${match} wajib diisi!`);
-            return;
-        }
-    }
-    
-    // Show loading
-    document.getElementById('loading').classList.remove('hidden');
-    document.getElementById('results').classList.add('hidden');
-    
-    // Process each match
-    const allMatchResults = {};
-    
-    for (const [matchNum, images] of Object.entries(matches)) {
-        try {
-            const result = await scanMatchImages(images.left, images.right, matchNum);
-            allMatchResults[matchNum] = result;
-        } catch (error) {
-            console.error(`Error scanning match ${matchNum}:`, error);
-            allMatchResults[matchNum] = {};
-        }
-    }
-    
-    // Calculate standings
-    const standings = calculateTotalPoints(allMatchResults);
-    
-    // Display results
-    displayStandings(standings, allMatchResults);
-    
-    // Hide loading
-    document.getElementById('loading').classList.add('hidden');
-    document.getElementById('results').classList.remove('hidden');
+  }
 }
 
-async function scanMatchImages(leftImage, rightImage, matchNum) {
-    // Simulasi AI scan (karena API key perlu di backend)
-    // Di production, panggil API ke /api/scan-match
-    
-    const formData = new FormData();
-    formData.append('left', leftImage);
-    formData.append('right', rightImage);
-    formData.append('match', matchNum);
-    formData.append('captains', JSON.stringify(tournamentData.captains));
-    
-    try {
-        const response = await fetch('/api/scan-match', {
-            method: 'POST',
-            body: formData
-        });
-        
-        if (!response.ok) throw new Error('Scan failed');
-        
-        return await response.json();
-    } catch (error) {
-        console.warn('Backend not available, using mock data');
-        return generateMockData(matchNum);
-    }
+function createSlot(m, s) {
+  const wrapper = document.createElement('div');
+  wrapper.className = 'match-slot';
+  wrapper.id = `slot-${m}-${s}`;
+  wrapper.onclick = () => triggerInput(m, s);
+
+  const optLabel = s === 1
+    ? '<span class="slot-opt-badge">opsional</span>'
+    : '';
+
+  wrapper.innerHTML = `
+    <div class="slot-icon">📷</div>
+    <div class="slot-label">${s === 0 ? 'Foto A' : 'Foto B'}</div>
+    ${optLabel}
+    <input type="file" id="file-${m}-${s}" accept="image/*">
+  `;
+
+  wrapper.querySelector('input').addEventListener('change', (e) => handleFile(e, m, s));
+  return wrapper;
 }
 
-function generateMockData(matchNum) {
-    // Mock data untuk testing
-    const mockResults = {};
-    tournamentData.captains.forEach((captain, idx) => {
-        const rank = (idx % 12) + 1;
-        const kills = Math.floor(Math.random() * 15);
-        mockResults[captain] = {
-            rank: rank,
-            kills: kills,
-            rankPoints: RANK_POINTS[rank] || 0,
-            totalPoints: (RANK_POINTS[rank] || 0) + kills,
-            isBooyah: rank === 1
-        };
+function triggerInput(m, s) {
+  document.getElementById(`file-${m}-${s}`).click();
+}
+
+// ============================================================
+// FILE HANDLING
+// ============================================================
+function handleFile(e, m, s) {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    matchData[m][s] = { file, preview: ev.target.result };
+    renderSlot(m, s);
+    updateStatus();
+  };
+  reader.readAsDataURL(file);
+}
+
+function renderSlot(m, s) {
+  const slot = document.getElementById(`slot-${m}-${s}`);
+  const data = matchData[m][s];
+  const optLabel = s === 1 ? '<span class="slot-opt-badge">opsional</span>' : '';
+
+  if (data && data.preview) {
+    slot.className = 'match-slot has-image';
+    slot.innerHTML = `
+      <img class="slot-preview" src="${data.preview}" alt="Match ${m+1} Foto ${s+1}">
+      <div class="slot-overlay">
+        <button class="remove-btn" onclick="removeSlot(event,${m},${s})">✕ Hapus</button>
+      </div>
+      ${optLabel}
+      <input type="file" id="file-${m}-${s}" accept="image/*">
+    `;
+    slot.querySelector('input').addEventListener('change', (e) => handleFile(e, m, s));
+    // re-assign click to trigger input (but not when clicking overlay)
+    slot.onclick = (e) => {
+      if (!e.target.closest('.slot-overlay')) triggerInput(m, s);
+    };
+  } else {
+    // rebuild blank slot
+    const newSlot = createSlot(m, s);
+    slot.replaceWith(newSlot);
+  }
+}
+
+function removeSlot(e, m, s) {
+  e.stopPropagation();
+  matchData[m][s] = null;
+  // reset file input by rebuilding
+  const slot = document.getElementById(`slot-${m}-${s}`);
+  const newSlot = createSlot(m, s);
+  slot.replaceWith(newSlot);
+  updateStatus();
+}
+
+// ============================================================
+// STATUS
+// ============================================================
+function getActiveMatches() {
+  // A match is "active" if slot A (index 0) has a file
+  return matchData
+    .map((slots, idx) => ({ idx, slotA: slots[0], slotB: slots[1] }))
+    .filter(m => m.slotA !== null);
+}
+
+function updateStatus() {
+  const active = getActiveMatches().length;
+  document.getElementById('matchCountInfo').textContent =
+    `${active} match diupload (min. ${MIN_MATCHES})`;
+  document.getElementById('btnCalculate').disabled = active < MIN_MATCHES;
+}
+
+// ============================================================
+// TOAST / LOADING
+// ============================================================
+function showToast(msg, dur = 5000) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('visible');
+  setTimeout(() => t.classList.remove('visible'), dur);
+}
+
+function setStep(msg) {
+  document.getElementById('loadingStep').textContent = msg;
+}
+
+function showLoading(show) {
+  document.getElementById('loadingOverlay').classList.toggle('active', show);
+}
+
+// ============================================================
+// IMAGE → BASE64
+// ============================================================
+function toBase64(file) {
+  return new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = e => res(e.target.result.split(',')[1]);
+    r.onerror = () => rej(new Error('Gagal membaca gambar'));
+    r.readAsDataURL(file);
+  });
+}
+
+// ============================================================
+// API CALL PER MATCH - UDAH DIEDIT BUAT DEEPSEEK
+// ============================================================
+async function extractMatch(matchIdx, slotA, slotB, captains) {
+  const capList = captains.join(', ');
+
+  // Build prompt for Deepseek
+  const prompt = `Ini adalah screenshot hasil akhir Free Fire Match ${matchIdx + 1}.
+${slotB ? 'Ada 2 gambar: sisi kiri dan sisi kanan layar hasil match.' : 'Ada 1 gambar hasil match.'}
+
+Daftar nama kapten yang harus dicari: ${capList}
+
+TUGAS:
+1. Baca semua nama pemain dari gambar.
+2. Cari nama kapten atau yang paling mirip di antara semua pemain.
+3. Catat POSISI/RANK tim kapten (angka 1-12).
+4. Catat TOTAL KILL semua anggota tim kapten.
+5. Jika tidak ditemukan sama sekali: rank 0, kills 0, found false.
+
+CATATAN:
+- Nama bisa sedikit berbeda (spasi, karakter khusus, huruf besar/kecil).
+- Jumlahkan semua kill seluruh anggota tim kapten.
+- Kembalikan HANYA JSON mentah, tanpa markdown, tanpa backtick.
+
+Format wajib:
+{"match":${matchIdx + 1},"results":[{"captain":"nama","rank":angka,"kills":angka,"found":true_atau_false}]}`;
+
+  // Kirim gambar ke Deepseek pake format vision
+  const contents = [];
+  
+  // Tambahin gambar slot A
+  const b64A = await toBase64(slotA.file);
+  const mimeA = slotA.file.type || 'image/jpeg';
+  contents.push({
+    type: 'image_url',
+    image_url: { url: `data:${mimeA};base64,${b64A}` }
+  });
+  
+  // Tambahin gambar slot B kalo ada
+  if (slotB) {
+    const b64B = await toBase64(slotB.file);
+    const mimeB = slotB.file.type || 'image/jpeg';
+    contents.push({
+      type: 'image_url',
+      image_url: { url: `data:${mimeB};base64,${b64B}` }
     });
-    return mockResults;
+  }
+  
+  // Tambahin teks prompt
+  contents.push({ type: 'text', text: prompt });
+
+  const resp = await fetch('/api/deepseek', {  // <-- GANTI JADI DEEPSEEK
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: 'deepseek-chat',
+      messages: [
+        {
+          role: 'user',
+          content: contents
+        }
+      ],
+      max_tokens: 1000
+    })
+  });
+
+  if (!resp.ok) {
+    const err = await resp.text();
+    throw new Error(`API ${resp.status}: ${err.slice(0, 200)}`);
+  }
+
+  const data = await resp.json();
+  const raw = (data.choices?.[0]?.message?.content || '').trim();
+  const clean = raw.replace(/```json|```/g, '').trim();
+
+  try {
+    return JSON.parse(clean);
+  } catch {
+    throw new Error(`Gagal parse JSON match ${matchIdx + 1}: ${clean.slice(0, 120)}`);
+  }
 }
 
-function calculateTotalPoints(allMatchResults) {
-    const standings = {};
-    
-    tournamentData.captains.forEach(captain => {
-        standings[captain] = {
-            totalPoints: 0,
-            totalKills: 0,
-            booyahCount: 0,
-            matches: []
-        };
-    });
-    
-    for (const [matchNum, matchResult] of Object.entries(allMatchResults)) {
-        for (const [captain, data] of Object.entries(matchResult)) {
-            if (standings[captain]) {
-                standings[captain].totalPoints += data.totalPoints;
-                standings[captain].totalKills += data.kills;
-                if (data.isBooyah) standings[captain].booyahCount++;
-                standings[captain].matches.push({
-                    match: matchNum,
-                    rank: data.rank,
-                    kills: data.kills,
-                    points: data.totalPoints
-                });
-            }
-        }
+// ============================================================
+// MAIN CALCULATE (GAK BERUBAH)
+// ============================================================
+async function calculate() {
+  const ftName = document.getElementById('ftName').value.trim();
+  const capRaw = document.getElementById('captainNames').value.trim();
+
+  if (!ftName) { showToast('Nama FT wajib diisi!'); return; }
+  if (!capRaw) { showToast('Nama kapten wajib diisi!'); return; }
+
+  const captains = capRaw.split(/[\n,]+/).map(s => s.trim()).filter(Boolean);
+  if (!captains.length) { showToast('Masukkan minimal 1 nama kapten!'); return; }
+
+  const activeMatches = getActiveMatches();
+  if (activeMatches.length < MIN_MATCHES) {
+    showToast(`Upload minimal ${MIN_MATCHES} foto Match (Foto A setiap match wajib ada)!`);
+    return;
+  }
+
+  showLoading(true);
+  const allResults = [];
+
+  try {
+    for (let i = 0; i < activeMatches.length; i++) {
+      const { idx, slotA, slotB } = activeMatches[i];
+      setStep(`Membaca Match ${idx + 1}... (${i + 1}/${activeMatches.length})`);
+      const result = await extractMatch(idx, slotA, slotB, captains);
+      allResults.push(result);
+      setStep(`Match ${idx + 1} selesai ✓`);
+      await new Promise(r => setTimeout(r, 300));
     }
-    
-    // Sort: points desc, booyah desc, kills desc
-    const sorted = Object.entries(standings).sort((a, b) => {
-        if (a[1].totalPoints !== b[1].totalPoints) {
-            return b[1].totalPoints - a[1].totalPoints;
-        }
-        if (a[1].booyahCount !== b[1].booyahCount) {
-            return b[1].booyahCount - a[1].booyahCount;
-        }
-        return b[1].totalKills - a[1].totalKills;
-    });
-    
-    return sorted;
+
+    setStep('Menghitung total standing...');
+    await new Promise(r => setTimeout(r, 400));
+    buildStandings(captains, allResults, ftName, activeMatches.length);
+
+  } catch (err) {
+    console.error(err);
+    showToast('Error: ' + err.message, 7000);
+  } finally {
+    showLoading(false);
+  }
 }
 
-function displayStandings(standings, matchDetails) {
-    const ftDisplay = document.getElementById('ftDisplay');
-    ftDisplay.innerHTML = `<strong>🏢 ${tournamentData.ftName}</strong>`;
-    
-    let html = '<table><thead><tr>';
-    html += '<th>No</th><th>Team Name</th><th>🏆 Booyah</th><th>💀 Kills</th><th>⭐ ST Points</th><th>📊 Total Pts</th><th>🥇 Juara</th>';
-    html += '</tr></thead><tbody>';
-    
-    standings.forEach(([team, data], idx) => {
-        const rank = idx + 1;
-        let rankClass = '';
-        let trophy = '';
-        
-        if (rank === 1) {
-            rankClass = 'rank-1';
-            trophy = '🥇';
-        } else if (rank === 2) {
-            rankClass = 'rank-2';
-            trophy = '🥈';
-        } else if (rank === 3) {
-            rankClass = 'rank-3';
-            trophy = '🥉';
-        }
-        
-        html += `<tr class="${rankClass}">`;
-        html += `<td>${rank}</td>`;
-        html += `<td><strong>${team}</strong></td>`;
-        html += `<td>${data.booyahCount}</td>`;
-        html += `<td>${data.totalKills}</td>`;
-        html += `<td>${data.totalPoints - data.totalKills}</td>`;
-        html += `<td><strong>${data.totalPoints}</strong></td>`;
-        html += `<td class="trophy">${trophy}</td>`;
-        html += '</tr>';
+// ============================================================
+// BUILD STANDINGS (GAK BERUBAH)
+// ============================================================
+function buildStandings(captains, allResults, ftName, matchCount) {
+  const stats = {};
+  captains.forEach(cap => {
+    stats[cap] = { captain: cap, booyah: 0, totalKills: 0, stPoints: 0, matches: [] };
+  });
+
+  allResults.forEach(matchResult => {
+    matchResult.results.forEach(r => {
+      const s = stats[r.captain];
+      if (!s) return;
+      const rp = RANK_POINTS[r.rank] || 0;
+      s.totalKills += r.kills;
+      s.stPoints += rp;
+      if (r.rank === 1) s.booyah++;
+      s.matches.push({ match: matchResult.match, rank: r.rank, kills: r.kills, found: r.found, rankPts: rp });
     });
-    
-    html += '</tbody></table>';
-    document.getElementById('standingsTable').innerHTML = html;
-    
-    // Store match details for breakdown
-    window.matchDetails = matchDetails;
-    window.standingsData = standings;
+  });
+
+  const rows = captains.map(cap => {
+    const s = stats[cap];
+    s.totalPts = s.stPoints + s.totalKills;
+    return s;
+  });
+
+  // Sort descending: total poin tertinggi = juara 1
+  rows.sort((a, b) => {
+    if (b.totalPts !== a.totalPts) return b.totalPts - a.totalPts;
+    if (b.booyah !== a.booyah) return b.booyah - a.booyah;
+    return b.totalKills - a.totalKills;
+  });
+
+  renderStandings(rows, ftName, matchCount, allResults);
 }
 
-function showBreakdown() {
-    const breakdownContent = document.getElementById('breakdownContent');
-    let html = '';
-    
-    window.standingsData.forEach(([team, data]) => {
-        html += `<div style="margin-bottom: 30px; padding: 15px; background: rgba(255,255,255,0.05); border-radius: 10px;">`;
-        html += `<h3 style="color: #ffd700;">${team}</h3>`;
-        html += `<table style="width: 100%; margin-top: 10px;">`;
-        html += `<thead><tr><th>Match</th><th>Rank</th><th>Kills</th><th>Rank Points</th><th>Match Points</th></tr></thead><tbody>`;
-        
-        data.matches.forEach(match => {
-            html += `<tr>`;
-            html += `<td>Match ${match.match}</td>`;
-            html += `<td>#${match.rank}</td>`;
-            html += `<td>${match.kills}</td>`;
-            html += `<td>${match.points - match.kills}</td>`;
-            html += `<td><strong>${match.points}</strong></td>`;
-            html += `</tr>`;
-        });
-        
-        html += `<tr style="background: rgba(255,215,0,0.2);">`;
-        html += `<td colspan="3"><strong>TOTAL</strong></td>`;
-        html += `<td><strong>${data.totalPoints - data.totalKills}</strong></td>`;
-        html += `<td><strong>${data.totalPoints}</strong></td>`;
-        html += `</tr>`;
-        html += `</tbody></table></div>`;
-    });
-    
-    breakdownContent.innerHTML = html;
-    document.getElementById('breakdownModal').classList.remove('hidden');
+// ============================================================
+// RENDER RESULT (GAK BERUBAH)
+// ============================================================
+function renderStandings(rows, ftName, matchCount, allResults) {
+  const tbody = document.getElementById('standingsBody');
+  tbody.innerHTML = '';
+  const trophies = ['🥇', '🥈', '🥉'];
+
+  rows.forEach((row, idx) => {
+    const rank = idx + 1;
+    const tr = document.createElement('tr');
+    tr.className = `table-row ${rank <= 3 ? 'rank-' + rank : ''}`;
+    tr.innerHTML = `
+      <td>${String(rank).padStart(2, '0')}</td>
+      <td>${esc(row.captain)}</td>
+      <td class="num-cell">${row.booyah}</td>
+      <td class="num-cell">${row.totalKills}</td>
+      <td class="num-cell">${row.stPoints}</td>
+      <td class="total-pts">${row.totalPts}</td>
+      <td>${rank <= 3 ? '<span class="trophy">' + trophies[rank - 1] + '</span>' : ''}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  buildBreakdown(rows, matchCount);
+
+  document.getElementById('ftCreditName').textContent = ftName;
+  document.getElementById('formSection').style.display = 'none';
+  document.getElementById('resultSection').classList.add('visible');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
-// Close modal on click outside
-window.onclick = function(event) {
-    const modal = document.getElementById('breakdownModal');
-    if (event.target === modal) {
-        modal.classList.add('hidden');
+function buildBreakdown(rows, matchCount) {
+  const table = document.getElementById('breakdownTable');
+  let html = '<tr><th>Kapten</th>';
+  for (let m = 0; m < matchCount; m++) {
+    html += `<th colspan="3">Match ${m + 1}</th>`;
+  }
+  html += '<th>Total</th></tr>';
+  html += '<tr><th></th>';
+  for (let m = 0; m < matchCount; m++) {
+    html += '<th>Rank</th><th>Kill</th><th>Pts</th>';
+  }
+  html += '<th></th></tr>';
+
+  rows.forEach(row => {
+    html += `<tr><td style="text-align:left;font-weight:600;">${esc(row.captain)}</td>`;
+    for (let m = 0; m < matchCount; m++) {
+      const md = row.matches.find(x => x.match === m + 1);
+      if (md && md.found) {
+        html += `<td style="color:#7aabff;">#${md.rank}</td><td style="color:#7aabff;">${md.kills}</td><td style="color:#FFD700;">${md.rankPts + md.kills}</td>`;
+      } else {
+        html += `<td style="color:#333;">-</td><td style="color:#333;">-</td><td style="color:#333;">0</td>`;
+      }
     }
-};
+    html += `<td style="color:#FFD700;font-weight:700;">${row.totalPts}</td></tr>`;
+  });
+
+  table.innerHTML = html;
+}
+
+function toggleBreakdown() {
+  const wrap = document.getElementById('breakdownWrap');
+  wrap.classList.toggle('visible');
+  document.querySelector('.btn-toggle').textContent =
+    wrap.classList.contains('visible') ? 'Sembunyikan Detail ▴' : 'Detail Per Match ▾';
+}
+
+function resetAll() {
+  for (let m = 0; m < MAX_MATCHES; m++) {
+    matchData[m] = [null, null];
+  }
+  document.getElementById('ftName').value = '';
+  document.getElementById('captainNames').value = '';
+  document.getElementById('breakdownWrap').classList.remove('visible');
+  document.getElementById('resultSection').classList.remove('visible');
+  document.getElementById('formSection').style.display = 'block';
+  buildMatchGrid();
+  updateStatus();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function esc(s) {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+// ============================================================
+// INIT
+// ============================================================
+buildMatchGrid();
+updateStatus();
