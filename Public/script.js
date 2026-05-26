@@ -7,13 +7,12 @@
 
   function buildMatchGrid() {
     const grid = document.getElementById('matchGrid');
-    if (!grid) { console.error('matchGrid not found'); return; }
+    if (!grid) return;
     grid.innerHTML = '';
     for (let m = 0; m < MAX_MATCHES; m++) {
       const isRequired = m < MIN_MATCHES;
       const block = document.createElement('div');
       block.className = 'match-block';
-      block.id = `block-${m}`;
       const dotClass = isRequired ? 'req-dot' : 'opt-dot';
       const label = isRequired ? 'Wajib' : 'Opsional';
       block.innerHTML = `<div class="match-block-title"><span class="${dotClass}"></span>MATCH ${m + 1}<span style="font-size:8px;color:${isRequired ? '#3a7bd5' : '#2a3a5a'}">${label}</span></div><div class="slot-row" id="slots-${m}"></div>`;
@@ -34,14 +33,12 @@
     wrapper.onclick = () => triggerInput(m, s);
     const optLabel = s === 1 ? '<span class="slot-opt-badge">opsional</span>' : '';
     wrapper.innerHTML = `<div class="slot-icon">📷</div><div class="slot-label">${s === 0 ? 'Foto A' : 'Foto B'}</div>${optLabel}<input type="file" id="file-${m}-${s}" accept="image/*">`;
-    const fileInput = wrapper.querySelector('input');
-    if (fileInput) fileInput.addEventListener('change', (e) => handleFile(e, m, s));
+    wrapper.querySelector('input').addEventListener('change', (e) => handleFile(e, m, s));
     return wrapper;
   }
 
   function triggerInput(m, s) {
-    const input = document.getElementById(`file-${m}-${s}`);
-    if (input) input.click();
+    document.getElementById(`file-${m}-${s}`).click();
   }
 
   function handleFile(e, m, s) {
@@ -63,9 +60,8 @@
     const optLabel = s === 1 ? '<span class="slot-opt-badge">opsional</span>' : '';
     if (data && data.preview) {
       slot.className = 'match-slot has-image';
-      slot.innerHTML = `<img class="slot-preview" src="${data.preview}" alt="Match ${m+1} Foto ${s+1}"><div class="slot-overlay"><button class="remove-btn" onclick="removeSlot(event,${m},${s})">✕ Hapus</button></div>${optLabel}<input type="file" id="file-${m}-${s}" accept="image/*">`;
-      const fileInput = slot.querySelector('input');
-      if (fileInput) fileInput.addEventListener('change', (e) => handleFile(e, m, s));
+      slot.innerHTML = `<img class="slot-preview" src="${data.preview}"><div class="slot-overlay"><button class="remove-btn" onclick="window.removeSlot(event,${m},${s})">✕ Hapus</button></div>${optLabel}<input type="file" id="file-${m}-${s}" accept="image/*">`;
+      slot.querySelector('input').addEventListener('change', (e) => handleFile(e, m, s));
       slot.onclick = (e) => { if (!e.target.closest('.slot-overlay')) triggerInput(m, s); };
     } else {
       const newSlot = createSlot(m, s);
@@ -77,10 +73,7 @@
     e.stopPropagation();
     matchData[m][s] = null;
     const slot = document.getElementById(`slot-${m}-${s}`);
-    if (slot) {
-      const newSlot = createSlot(m, s);
-      slot.replaceWith(newSlot);
-    }
+    if (slot) slot.replaceWith(createSlot(m, s));
     updateStatus();
   };
 
@@ -96,12 +89,12 @@
     if (btn) btn.disabled = active < MIN_MATCHES;
   }
 
-  function showToast(msg, dur = 5000) {
+  function showToast(msg) {
     const t = document.getElementById('toast');
     if (!t) return;
     t.textContent = msg;
     t.classList.add('visible');
-    setTimeout(() => t.classList.remove('visible'), dur);
+    setTimeout(() => t.classList.remove('visible'), 5000);
   }
 
   function setStep(msg) {
@@ -118,175 +111,145 @@
     return new Promise((res, rej) => {
       const r = new FileReader();
       r.onload = e => res(e.target.result.split(',')[1]);
-      r.onerror = () => rej(new Error('Gagal membaca gambar'));
+      r.onerror = rej;
       r.readAsDataURL(file);
     });
   }
 
   async function extractMatch(matchIdx, slotA, slotB, captains) {
     const capList = captains.join(', ');
-    const prompt = `Ini adalah screenshot hasil akhir Free Fire Match ${matchIdx + 1}. ${slotB ? 'Ada 2 gambar: sisi kiri dan sisi kanan layar hasil match.' : 'Ada 1 gambar hasil match.'} Daftar nama kapten yang harus dicari: ${capList}. TUGAS: 1. Baca semua nama pemain dari gambar. 2. Cari nama kapten atau yang paling mirip di antara semua pemain. 3. Catat POSISI/RANK tim kapten (angka 1-12). 4. Catat TOTAL KILL semua anggota tim kapten. 5. Jika tidak ditemukan sama sekali: rank 0, kills 0, found false. CATATAN: Nama bisa sedikit berbeda. Jumlahkan semua kill seluruh anggota tim kapten. Kembalikan HANYA JSON mentah, tanpa markdown, tanpa backtick. Format wajib: {"match":${matchIdx + 1},"results":[{"captain":"nama","rank":angka,"kills":angka,"found":true_atau_false}]}`;
+    const prompt = `Ini screenshot Free Fire Match ${matchIdx + 1}. ${slotB ? 'Ada 2 gambar.' : 'Ada 1 gambar.'} Cari nama kapten dari daftar: ${capList}. Beri rank (1-12) dan total kill tim kapten. Kembalikan JSON: {"match":${matchIdx + 1},"results":[{"captain":"nama","rank":angka,"kills":angka,"found":true/false}]}`;
+    
     const contents = [];
     const b64A = await toBase64(slotA.file);
-    const mimeA = slotA.file.type || 'image/jpeg';
-    contents.push({ type: 'image_url', image_url: { url: `data:${mimeA};base64,${b64A}` } });
+    contents.push({ type: 'image_url', image_url: { url: `data:${slotA.file.type};base64,${b64A}` } });
     if (slotB) {
       const b64B = await toBase64(slotB.file);
-      const mimeB = slotB.file.type || 'image/jpeg';
-      contents.push({ type: 'image_url', image_url: { url: `data:${mimeB};base64,${b64B}` } });
+      contents.push({ type: 'image_url', image_url: { url: `data:${slotB.file.type};base64,${b64B}` } });
     }
     contents.push({ type: 'text', text: prompt });
+
     const resp = await fetch('/api/deepseek', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ model: 'deepseek-chat', messages: [{ role: 'user', content: contents }], max_tokens: 1000 })
     });
-    if (!resp.ok) {
-      const err = await resp.text();
-      throw new Error(`API ${resp.status}: ${err.slice(0, 200)}`);
-    }
+    if (!resp.ok) throw new Error(`API Error ${resp.status}`);
     const data = await resp.json();
-    const raw = (data.choices?.[0]?.message?.content || '').trim();
+    const raw = data.choices?.[0]?.message?.content || '';
     const clean = raw.replace(/```json|```/g, '').trim();
-    try {
-      return JSON.parse(clean);
-    } catch {
-      throw new Error(`Gagal parse JSON match ${matchIdx + 1}: ${clean.slice(0, 120)}`);
-    }
+    return JSON.parse(clean);
   }
 
   window.calculate = async function() {
     const ftName = document.getElementById('ftName').value.trim();
     const capRaw = document.getElementById('captainNames').value.trim();
-    if (!ftName) { showToast('Nama FT wajib diisi!'); return; }
-    if (!capRaw) { showToast('Nama kapten wajib diisi!'); return; }
+    if (!ftName) return showToast('Nama FT wajib diisi!');
+    if (!capRaw) return showToast('Nama kapten wajib diisi!');
     const captains = capRaw.split(/[\n,]+/).map(s => s.trim()).filter(Boolean);
-    if (!captains.length) { showToast('Masukkan minimal 1 nama kapten!'); return; }
+    if (!captains.length) return showToast('Masukkan nama kapten!');
     const activeMatches = getActiveMatches();
-    if (activeMatches.length < MIN_MATCHES) { showToast(`Upload minimal ${MIN_MATCHES} foto Match!`); return; }
+    if (activeMatches.length < MIN_MATCHES) return showToast(`Upload minimal ${MIN_MATCHES} foto!`);
+    
     showLoading(true);
     const allResults = [];
     try {
       for (let i = 0; i < activeMatches.length; i++) {
         const { idx, slotA, slotB } = activeMatches[i];
-        setStep(`Membaca Match ${idx + 1}... (${i + 1}/${activeMatches.length})`);
-        const result = await extractMatch(idx, slotA, slotB, captains);
-        allResults.push(result);
+        setStep(`Match ${idx + 1}... (${i + 1}/${activeMatches.length})`);
+        allResults.push(await extractMatch(idx, slotA, slotB, captains));
         setStep(`Match ${idx + 1} selesai ✓`);
         await new Promise(r => setTimeout(r, 300));
       }
-      setStep('Menghitung total standing...');
+      setStep('Menghitung standing...');
       await new Promise(r => setTimeout(r, 400));
-      buildStandings(captains, allResults, ftName, activeMatches.length);
+      
+      const stats = {};
+      captains.forEach(cap => { stats[cap] = { captain: cap, booyah: 0, totalKills: 0, stPoints: 0, matches: [] }; });
+      allResults.forEach(matchResult => {
+        if (matchResult?.results) {
+          matchResult.results.forEach(r => {
+            const s = stats[r.captain];
+            if (s) {
+              const rp = RANK_POINTS[r.rank] || 0;
+              s.totalKills += r.kills;
+              s.stPoints += rp;
+              if (r.rank === 1) s.booyah++;
+              s.matches.push({ match: matchResult.match, rank: r.rank, kills: r.kills, found: r.found, rankPts: rp });
+            }
+          });
+        }
+      });
+      const rows = captains.map(cap => { const s = stats[cap]; s.totalPts = s.stPoints + s.totalKills; return s; });
+      rows.sort((a, b) => {
+        if (b.totalPts !== a.totalPts) return b.totalPts - a.totalPts;
+        if (b.booyah !== a.booyah) return b.booyah - a.booyah;
+        return b.totalKills - a.totalKills;
+      });
+      
+      const tbody = document.getElementById('standingsBody');
+      if (tbody) {
+        tbody.innerHTML = '';
+        const trophies = ['🥇', '🥈', '🥉'];
+        rows.forEach((row, idx) => {
+          const rank = idx + 1;
+          tbody.innerHTML += `<tr class="${rank <= 3 ? 'rank-' + rank : ''}"><td>${String(rank).padStart(2,'0')}</td><td style="text-align:left">${row.captain}</td><td>${row.booyah}</td><td>${row.totalKills}</td><td>${row.stPoints}</td><td class="total-pts">${row.totalPts}</td><td>${rank <= 3 ? '<span class="trophy">' + trophies[rank-1] + '</span>' : ''}</td></tr>`;
+        });
+      }
+      
+      const table = document.getElementById('breakdownTable');
+      if (table) {
+        let html = '<table class="breakdown-table"><tr><th>Kapten</th>';
+        for (let m = 0; m < activeMatches.length; m++) html += `<th colspan="3">Match ${m+1}</th>`;
+        html += '<th>Total</th></tr>';
+        html += '<tr><th></th>';
+        for (let m = 0; m < activeMatches.length; m++) html += '<th>Rank</th><th>Kill</th><th>Pts</th>';
+        html += '<th></th></tr>';
+        rows.forEach(row => {
+          html += `<tr><td>${row.captain}</td>`;
+          for (let m = 0; m < activeMatches.length; m++) {
+            const md = row.matches.find(x => x.match === m+1);
+            if (md && md.found) html += `<td>#${md.rank}</td><td>${md.kills}</td><td>${md.rankPts + md.kills}</td>`;
+            else html += `<td>-</td><td>-</td><td>0</td>`;
+          }
+          html += `<td>${row.totalPts}</td></tr>`;
+        });
+        html += '</table>';
+        table.innerHTML = html;
+      }
+      
+      document.getElementById('ftCreditName').textContent = ftName;
+      document.getElementById('formSection').style.display = 'none';
+      document.getElementById('resultSection').classList.add('visible');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (err) {
       console.error(err);
-      showToast('Error: ' + err.message, 7000);
+      showToast('Error: ' + err.message);
     } finally {
       showLoading(false);
     }
   };
 
-  function buildStandings(captains, allResults, ftName, matchCount) {
-    const stats = {};
-    captains.forEach(cap => { stats[cap] = { captain: cap, booyah: 0, totalKills: 0, stPoints: 0, matches: [] }; });
-    allResults.forEach(matchResult => {
-      if (matchResult && matchResult.results) {
-        matchResult.results.forEach(r => {
-          const s = stats[r.captain];
-          if (!s) return;
-          const rp = RANK_POINTS[r.rank] || 0;
-          s.totalKills += r.kills;
-          s.stPoints += rp;
-          if (r.rank === 1) s.booyah++;
-          s.matches.push({ match: matchResult.match, rank: r.rank, kills: r.kills, found: r.found, rankPts: rp });
-        });
-      }
-    });
-    const rows = captains.map(cap => { const s = stats[cap]; s.totalPts = s.stPoints + s.totalKills; return s; });
-    rows.sort((a, b) => {
-      if (b.totalPts !== a.totalPts) return b.totalPts - a.totalPts;
-      if (b.booyah !== a.booyah) return b.booyah - a.booyah;
-      return b.totalKills - a.totalKills;
-    });
-    renderStandings(rows, ftName, matchCount);
-  }
-
-  function renderStandings(rows, ftName, matchCount) {
-    const tbody = document.getElementById('standingsBody');
-    if (!tbody) return;
-    tbody.innerHTML = '';
-    const trophies = ['🥇', '🥈', '🥉'];
-    rows.forEach((row, idx) => {
-      const rank = idx + 1;
-      const tr = document.createElement('tr');
-      tr.className = `table-row ${rank <= 3 ? 'rank-' + rank : ''}`;
-      tr.innerHTML = `<td style="text-align:center">${String(rank).padStart(2, '0')}</td><td style="text-align:left">${esc(row.captain)}</td><td style="text-align:center">${row.booyah}</td><td style="text-align:center">${row.totalKills}</td><td style="text-align:center">${row.stPoints}</td><td style="text-align:center" class="total-pts">${row.totalPts}</td><td style="text-align:center">${rank <= 3 ? '<span class="trophy">' + trophies[rank - 1] + '</span>' : ''}</td>`;
-      tbody.appendChild(tr);
-    });
-    buildBreakdown(rows, matchCount);
-    const ftCredit = document.getElementById('ftCreditName');
-    if (ftCredit) ftCredit.textContent = ftName;
-    const formSection = document.getElementById('formSection');
-    const resultSection = document.getElementById('resultSection');
-    if (formSection) formSection.style.display = 'none';
-    if (resultSection) resultSection.classList.add('visible');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  }
-
-  function buildBreakdown(rows, matchCount) {
-    const table = document.getElementById('breakdownTable');
-    if (!table) return;
-    let html = '<table class="breakdown-table"><tr><th>Kapten</th>';
-    for (let m = 0; m < matchCount; m++) html += `<th colspan="3">Match ${m + 1}</th>`;
-    html += '<th>Total</th></tr>';
-    html += '<tr><th></th>';
-    for (let m = 0; m < matchCount; m++) html += '<th>Rank</th><th>Kill</th><th>Pts</th>';
-    html += '<th></th></tr>';
-    rows.forEach(row => {
-      html += `<tr><td style="text-align:left;font-weight:600;">${esc(row.captain)}</td>`;
-      for (let m = 0; m < matchCount; m++) {
-        const md = row.matches.find(x => x.match === m + 1);
-        if (md && md.found) {
-          html += `<td style="color:#7aabff;text-align:center">#${md.rank}</td><td style="color:#7aabff;text-align:center">${md.kills}</td><td style="color:#FFD700;text-align:center">${md.rankPts + md.kills}</td>`;
-        } else {
-          html += `<td style="color:#333;text-align:center">-</td><td style="color:#333;text-align:center">-</td><td style="color:#333;text-align:center">0</td>`;
-        }
-      }
-      html += `<td style="color:#FFD700;font-weight:700;text-align:center">${row.totalPts}</td></table>`;
-    });
-    html += '</table>';
-    table.innerHTML = html;
-  }
-
   window.toggleBreakdown = function() {
     const wrap = document.getElementById('breakdownWrap');
-    if (!wrap) return;
-    wrap.classList.toggle('visible');
-    const btn = document.querySelector('.btn-toggle');
-    if (btn) btn.textContent = wrap.classList.contains('visible') ? 'Sembunyikan Detail ▴' : 'Detail Per Match ▾';
+    if (wrap) {
+      wrap.classList.toggle('visible');
+      const btn = document.querySelector('.btn-toggle');
+      if (btn) btn.textContent = wrap.classList.contains('visible') ? 'Sembunyikan Detail ▴' : 'Detail Per Match ▾';
+    }
   };
 
   window.resetAll = function() {
-    for (let m = 0; m < MAX_MATCHES; m++) { matchData[m] = [null, null]; }
-    const ftName = document.getElementById('ftName');
-    const captainNames = document.getElementById('captainNames');
-    if (ftName) ftName.value = '';
-    if (captainNames) captainNames.value = '';
-    const breakdownWrap = document.getElementById('breakdownWrap');
-    if (breakdownWrap) breakdownWrap.classList.remove('visible');
-    const resultSection = document.getElementById('resultSection');
-    const formSection = document.getElementById('formSection');
-    if (resultSection) resultSection.classList.remove('visible');
-    if (formSection) formSection.style.display = 'block';
+    for (let m = 0; m < MAX_MATCHES; m++) matchData[m] = [null, null];
+    document.getElementById('ftName').value = '';
+    document.getElementById('captainNames').value = '';
+    document.getElementById('breakdownWrap')?.classList.remove('visible');
+    document.getElementById('resultSection')?.classList.remove('visible');
+    document.getElementById('formSection').style.display = 'block';
     buildMatchGrid();
     updateStatus();
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
-
-  function esc(s) {
-    if (!s) return '';
-    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  }
 
   buildMatchGrid();
   updateStatus();
