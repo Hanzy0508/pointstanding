@@ -2,7 +2,7 @@
 <html lang="id">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
   <title>FF Tournament Standing Calculator</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Orbitron:wght@400;700;900&family=Exo+2:wght@300;400;600;700&display=swap" rel="stylesheet">
@@ -16,9 +16,7 @@
     <div class="header-sub">Free Fire &nbsp;·&nbsp; Auto Calculator</div>
   </div>
 
-  <!-- FORM -->
   <div class="form-section" id="formSection">
-
     <div class="section-label">Info Turnamen</div>
     <div class="input-row">
       <div class="input-group">
@@ -45,59 +43,42 @@
     </button>
   </div>
 
-  <!-- RESULT -->
   <div class="result-section" id="resultSection">
     <div class="result-card">
       <div class="result-title">
         <h2>Overall</h2>
         <h3>Standings</h3>
       </div>
-
       <div class="table-wrap">
         <table class="standings-table">
           <thead>
-            <tr>
-              <th>No.</th>
-              <th style="text-align:left">Team Name</th>
-              <th>Booyah</th>
-              <th>Kills</th>
-              <th>ST Points</th>
-              <th>Total Pts</th>
-              <th>Juara</th>
-            </tr>
+            <tr><th>No.</th><th style="text-align:left">Team Name</th><th>Booyah</th><th>Kills</th><th>ST Points</th><th>Total Pts</th><th>Juara</th></tr>
           </thead>
           <tbody id="standingsBody"></tbody>
         </table>
       </div>
-
       <div class="breakdown-toggle">
         <button class="btn-toggle" onclick="toggleBreakdown()">Detail Per Match ▾</button>
       </div>
       <div class="breakdown-wrap" id="breakdownWrap">
         <div class="breakdown-scroll">
-          <table id="breakdownTable"></table>
+          <table id="breakdownTable" class="breakdown-table"></table>
         </div>
       </div>
-
-      <div class="ft-credit">
-        <span>FT by &nbsp;</span><strong id="ftCreditName">—</strong>
-      </div>
+      <div class="ft-credit"><span>FT by &nbsp;</span><strong id="ftCreditName">—</strong></div>
     </div>
-
     <button class="btn-reset" onclick="resetAll()">↺ &nbsp; Hitung Ulang / Reset</button>
   </div>
 </div>
 
-<!-- LOADING -->
 <div class="loading-overlay" id="loadingOverlay">
   <div class="loader-ring"></div>
   <div class="loading-text">Memproses Data</div>
   <div class="loading-step" id="loadingStep">Mempersiapkan foto...</div>
 </div>
 
-<!-- TOAST -->
 <div class="toast" id="toast"></div>
 
-<script src="app.js"></script>
+<script src="script.js"></script>
 </body>
 </html>
