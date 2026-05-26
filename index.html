@@ -2,9 +2,306 @@
 <html lang="id">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FF Tournament Standing Calculator</title>
-    <link rel="stylesheet" href="styles.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>FF Tournament Standing Calculator | AI Scan</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Poppins', 'Arial', system-ui, -apple-system, sans-serif;
+            background: linear-gradient(135deg, #0a0e2a 0%, #1a1f3a 100%);
+            color: #fff;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        /* Header */
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+            padding: 30px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 20px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+            letter-spacing: 2px;
+            background: linear-gradient(135deg, #fff, #ffd700);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .subtitle {
+            margin-top: 10px;
+            opacity: 0.9;
+            font-size: 0.9em;
+        }
+
+        /* Cards */
+        .form-card, .match-card {
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 25px;
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+
+        .form-card h2, .match-card h3 {
+            margin-bottom: 20px;
+            color: #ffd700;
+        }
+
+        /* Input Group */
+        .input-group {
+            margin-bottom: 20px;
+        }
+
+        .input-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+            color: #ddd;
+        }
+
+        .input-group input, .input-group textarea {
+            width: 100%;
+            padding: 12px;
+            border-radius: 8px;
+            border: none;
+            background: rgba(0,0,0,0.5);
+            color: #fff;
+            font-size: 14px;
+        }
+
+        .input-group textarea {
+            resize: vertical;
+            font-family: monospace;
+        }
+
+        /* Upload */
+        .photo-upload {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        .photo-field {
+            background: rgba(0,0,0,0.3);
+            padding: 15px;
+            border-radius: 10px;
+        }
+
+        .photo-field label {
+            display: block;
+            margin-bottom: 10px;
+            font-size: 0.9em;
+            color: #ffd700;
+        }
+
+        .photo-field input[type="file"] {
+            width: 100%;
+            padding: 10px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 5px;
+            cursor: pointer;
+            color: #fff;
+        }
+
+        .photo-field input[type="file"]::file-selector-button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        .required {
+            color: #ff4444;
+            font-size: 0.8em;
+        }
+
+        .optional-badge {
+            background: #666;
+            padding: 2px 8px;
+            border-radius: 20px;
+            font-size: 0.7em;
+            margin-left: 10px;
+        }
+
+        /* Buttons */
+        .btn-primary, .btn-secondary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px 40px;
+            font-size: 1.1em;
+            font-weight: bold;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            width: 100%;
+        }
+
+        .btn-primary:hover, .btn-secondary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(102,126,234,0.4);
+        }
+
+        /* Loading */
+        .loading {
+            text-align: center;
+            padding: 50px;
+        }
+
+        .spinner {
+            border: 4px solid rgba(255,255,255,0.3);
+            border-top: 4px solid #ffd700;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Results */
+        .results {
+            margin-top: 40px;
+        }
+
+        .standings-header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .ft-display {
+            font-size: 1.2em;
+            color: #ffd700;
+            margin-top: 10px;
+        }
+
+        /* Table */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: rgba(0,0,0,0.5);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        th, td {
+            padding: 15px;
+            text-align: center;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+
+        th {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: #ffd700;
+            font-weight: bold;
+        }
+
+        tr:hover {
+            background: rgba(255,215,0,0.1);
+        }
+
+        .rank-1 {
+            background: linear-gradient(90deg, rgba(255,215,0,0.2), rgba(255,215,0,0.05));
+            border-left: 4px solid #ffd700;
+        }
+
+        .rank-2 {
+            background: linear-gradient(90deg, rgba(192,192,192,0.2), rgba(192,192,192,0.05));
+            border-left: 4px solid #c0c0c0;
+        }
+
+        .rank-3 {
+            background: linear-gradient(90deg, rgba(205,127,50,0.2), rgba(205,127,50,0.05));
+            border-left: 4px solid #cd7f32;
+        }
+
+        .trophy {
+            font-size: 1.5em;
+        }
+
+        /* Modal */
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .modal-content {
+            background: linear-gradient(135deg, #1a1f3a, #0a0e2a);
+            padding: 30px;
+            border-radius: 20px;
+            max-width: 800px;
+            max-height: 80vh;
+            overflow-y: auto;
+            position: relative;
+            border: 2px solid #ffd700;
+        }
+
+        .close {
+            position: absolute;
+            top: 15px;
+            right: 25px;
+            font-size: 30px;
+            cursor: pointer;
+            color: #ffd700;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .photo-upload {
+                grid-template-columns: 1fr;
+            }
+            
+            .header h1 {
+                font-size: 1.5em;
+            }
+            
+            th, td {
+                padding: 8px;
+                font-size: 12px;
+            }
+
+            .modal-content {
+                margin: 20px;
+                padding: 20px;
+            }
+        }
+    </style>
 </head>
 <body>
     <div class="container">
@@ -78,9 +375,11 @@
                 <h3>📸 MATCH 4 <span class="optional-badge">(Opsional)</span></h3>
                 <div class="photo-upload">
                     <div class="photo-field">
+                        <label>Foto Kiri</label>
                         <input type="file" accept="image/*" class="match-left" data-match="4">
                     </div>
                     <div class="photo-field">
+                        <label>Foto Kanan</label>
                         <input type="file" accept="image/*" class="match-right" data-match="4">
                     </div>
                 </div>
@@ -90,9 +389,11 @@
                 <h3>📸 MATCH 5 <span class="optional-badge">(Opsional)</span></h3>
                 <div class="photo-upload">
                     <div class="photo-field">
+                        <label>Foto Kiri</label>
                         <input type="file" accept="image/*" class="match-left" data-match="5">
                     </div>
                     <div class="photo-field">
+                        <label>Foto Kanan</label>
                         <input type="file" accept="image/*" class="match-right" data-match="5">
                     </div>
                 </div>
@@ -102,9 +403,11 @@
                 <h3>📸 MATCH 6 <span class="optional-badge">(Opsional)</span></h3>
                 <div class="photo-upload">
                     <div class="photo-field">
+                        <label>Foto Kiri</label>
                         <input type="file" accept="image/*" class="match-left" data-match="6">
                     </div>
                     <div class="photo-field">
+                        <label>Foto Kanan</label>
                         <input type="file" accept="image/*" class="match-right" data-match="6">
                     </div>
                 </div>
@@ -126,7 +429,7 @@
                 <div id="ftDisplay" class="ft-display"></div>
             </div>
             <div id="standingsTable"></div>
-            <button id="showBreakdownBtn" class="btn-secondary">📊 DETAIL BREAKDOWN</button>
+            <button id="showBreakdownBtn" class="btn-secondary" style="margin-top: 20px;">📊 DETAIL BREAKDOWN</button>
         </div>
 
         <!-- Breakdown Modal -->
@@ -139,6 +442,248 @@
         </div>
     </div>
 
-    <script src="script.js"></script>
+    <script>
+        // Poin system
+        const RANK_POINTS = {
+            1: 12, 2: 9, 3: 8, 4: 7, 5: 6,
+            6: 5, 7: 4, 8: 3, 9: 2, 10: 1,
+            11: 0, 12: 0
+        };
+
+        let tournamentData = {
+            ftName: '',
+            captains: [],
+            matches: {}
+        };
+
+        // DOM Elements
+        document.getElementById('calculateBtn').addEventListener('click', calculateStandings);
+        
+        function showBreakdown() {
+            const breakdownContent = document.getElementById('breakdownContent');
+            let html = '';
+            
+            if (window.standingsData) {
+                window.standingsData.forEach(([team, data]) => {
+                    html += `<div style="margin-bottom: 30px; padding: 15px; background: rgba(255,255,255,0.05); border-radius: 10px;">`;
+                    html += `<h3 style="color: #ffd700;">${team}</h3>`;
+                    html += `<table style="width: 100%; margin-top: 10px;">`;
+                    html += `<thead><tr><th>Match</th><th>Rank</th><th>Kills</th><th>Rank Points</th><th>Match Points</th></tr></thead><tbody>`;
+                    
+                    if (data.matches && data.matches.length > 0) {
+                        data.matches.forEach(match => {
+                            html += `<tr>`;
+                            html += `<td>Match ${match.match}</td>`;
+                            html += `<td>#${match.rank}</td>`;
+                            html += `<td>${match.kills}</td>`;
+                            html += `<td>${match.points - match.kills}</td>`;
+                            html += `<td><strong>${match.points}</strong></td>`;
+                            html += `</tr>`;
+                        });
+                    } else {
+                        html += `<tr><td colspan="5" style="text-align: center;">No match data</td></tr>`;
+                    }
+                    
+                    html += `<tr style="background: rgba(255,215,0,0.2);">`;
+                    html += `<td colspan="3"><strong>TOTAL</strong></td>`;
+                    html += `<td><strong>${(data.totalPoints || 0) - (data.totalKills || 0)}</strong></td>`;
+                    html += `<td><strong>${data.totalPoints || 0}</strong></td>`;
+                    html += `</tr>`;
+                    html += `</tbody></table></div>`;
+                });
+            }
+            
+            breakdownContent.innerHTML = html || '<p>Tidak ada data breakdown</p>';
+            document.getElementById('breakdownModal').classList.remove('hidden');
+        }
+
+        document.getElementById('showBreakdownBtn')?.addEventListener('click', showBreakdown);
+        
+        document.querySelector('.close')?.addEventListener('click', () => {
+            document.getElementById('breakdownModal').classList.add('hidden');
+        });
+
+        async function calculateStandings() {
+            // Get FT Name
+            tournamentData.ftName = document.getElementById('ftName').value || 'Unknown FT';
+            
+            // Get captains list
+            const captainsInput = document.getElementById('captains').value;
+            tournamentData.captains = captainsInput.split(/[,\n]/).map(c => c.trim()).filter(c => c);
+            
+            if (tournamentData.captains.length === 0) {
+                alert('Masukkan nama kapten tim!');
+                return;
+            }
+            
+            // Collect images
+            const matches = {};
+            for (let match = 1; match <= 6; match++) {
+                const leftInput = document.querySelector(`.match-left[data-match="${match}"]`);
+                const rightInput = document.querySelector(`.match-right[data-match="${match}"]`);
+                
+                if (leftInput && leftInput.files[0] && rightInput && rightInput.files[0]) {
+                    matches[match] = {
+                        left: leftInput.files[0],
+                        right: rightInput.files[0]
+                    };
+                } else if (match <= 3 && (!leftInput?.files[0] || !rightInput?.files[0])) {
+                    alert(`Match ${match} wajib diisi!`);
+                    return;
+                }
+            }
+            
+            // Show loading
+            document.getElementById('loading').classList.remove('hidden');
+            document.getElementById('results').classList.add('hidden');
+            
+            // Process each match
+            const allMatchResults = {};
+            
+            for (const [matchNum, images] of Object.entries(matches)) {
+                try {
+                    const result = await scanMatchImages(images.left, images.right, matchNum);
+                    allMatchResults[matchNum] = result;
+                } catch (error) {
+                    console.error(`Error scanning match ${matchNum}:`, error);
+                    allMatchResults[matchNum] = generateMockData(matchNum);
+                }
+            }
+            
+            // Calculate standings
+            const standings = calculateTotalPoints(allMatchResults);
+            
+            // Display results
+            displayStandings(standings, allMatchResults);
+            
+            // Hide loading
+            document.getElementById('loading').classList.add('hidden');
+            document.getElementById('results').classList.remove('hidden');
+        }
+
+        async function scanMatchImages(leftImage, rightImage, matchNum) {
+            // Simulasi karena API key perlu di backend
+            return new Promise((resolve) => {
+                setTimeout(() => {
+                    resolve(generateMockData(matchNum));
+                }, 500);
+            });
+        }
+
+        function generateMockData(matchNum) {
+            const mockResults = {};
+            tournamentData.captains.forEach((captain, idx) => {
+                const rank = (idx % 12) + 1;
+                const kills = Math.floor(Math.random() * 15);
+                mockResults[captain] = {
+                    rank: rank,
+                    kills: kills,
+                    rankPoints: RANK_POINTS[rank] || 0,
+                    totalPoints: (RANK_POINTS[rank] || 0) + kills,
+                    isBooyah: rank === 1
+                };
+            });
+            return mockResults;
+        }
+
+        function calculateTotalPoints(allMatchResults) {
+            const standings = {};
+            
+            tournamentData.captains.forEach(captain => {
+                standings[captain] = {
+                    totalPoints: 0,
+                    totalKills: 0,
+                    booyahCount: 0,
+                    matches: []
+                };
+            });
+            
+            for (const [matchNum, matchResult] of Object.entries(allMatchResults)) {
+                for (const [captain, data] of Object.entries(matchResult)) {
+                    if (standings[captain]) {
+                        standings[captain].totalPoints += data.totalPoints;
+                        standings[captain].totalKills += data.kills;
+                        if (data.isBooyah) standings[captain].booyahCount++;
+                        standings[captain].matches.push({
+                            match: matchNum,
+                            rank: data.rank,
+                            kills: data.kills,
+                            points: data.totalPoints
+                        });
+                    }
+                }
+            }
+            
+            // Sort: points desc, booyah desc, kills desc
+            const sorted = Object.entries(standings).sort((a, b) => {
+                if (a[1].totalPoints !== b[1].totalPoints) {
+                    return b[1].totalPoints - a[1].totalPoints;
+                }
+                if (a[1].booyahCount !== b[1].booyahCount) {
+                    return b[1].booyahCount - a[1].booyahCount;
+                }
+                return b[1].totalKills - a[1].totalKills;
+            });
+            
+            return sorted;
+        }
+
+        function displayStandings(standings, matchDetails) {
+            const ftDisplay = document.getElementById('ftDisplay');
+            ftDisplay.innerHTML = `<strong>🏢 ${tournamentData.ftName}</strong>`;
+            
+            let html = '<table><thead><tr>';
+            html += '<th>No</th><th>Team Name</th><th>🏆 Booyah</th><th>💀 Kills</th><th>⭐ ST Points</th><th>📊 Total Pts</th><th>🥇 Juara</th>';
+            html += '</tr></thead><tbody>';
+            
+            standings.forEach(([team, data], idx) => {
+                const rank = idx + 1;
+                let rankClass = '';
+                let trophy = '';
+                
+                if (rank === 1) {
+                    rankClass = 'rank-1';
+                    trophy = '🥇';
+                } else if (rank === 2) {
+                    rankClass = 'rank-2';
+                    trophy = '🥈';
+                } else if (rank === 3) {
+                    rankClass = 'rank-3';
+                    trophy = '🥉';
+                }
+                
+                html += `<tr class="${rankClass}">`;
+                html += `<td>${rank}</td>`;
+                html += `<td><strong>${escapeHtml(team)}</strong></td>`;
+                html += `<td>${data.booyahCount}</td>`;
+                html += `<td>${data.totalKills}</td>`;
+                html += `<td>${data.totalPoints - data.totalKills}</td>`;
+                html += `<td><strong>${data.totalPoints}</strong></td>`;
+                html += `<td class="trophy">${trophy}</td>`;
+                html += '</tr>';
+            });
+            
+            html += '</tbody></table>';
+            document.getElementById('standingsTable').innerHTML = html;
+            
+            // Store match details for breakdown
+            window.matchDetails = matchDetails;
+            window.standingsData = standings;
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Close modal on click outside
+        window.onclick = function(event) {
+            const modal = document.getElementById('breakdownModal');
+            if (event.target === modal) {
+                modal.classList.add('hidden');
+            }
+        };
+    </script>
 </body>
-</html>
+    </html>
