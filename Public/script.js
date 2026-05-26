@@ -4,7 +4,7 @@
 const RANK_POINTS = {1:12,2:9,3:8,4:7,5:6,6:5,7:4,8:3,9:2,10:1,11:0,12:0};
 const MAX_MATCHES = 6;
 const MIN_MATCHES = 3;
-const SLOTS_PER_MATCH = 2; // slot A (wajib) dan slot B (opsional)
+const SLOTS_PER_MATCH = 2;
 
 // matchData[matchIdx][slotIdx] = { file, preview }
 const matchData = Array.from({length: MAX_MATCHES}, () => [null, null]);
@@ -14,6 +14,10 @@ const matchData = Array.from({length: MAX_MATCHES}, () => [null, null]);
 // ============================================================
 function buildMatchGrid() {
   const grid = document.getElementById('matchGrid');
+  if (!grid) {
+    console.error('Element matchGrid tidak ditemukan!');
+    return;
+  }
   grid.innerHTML = '';
 
   for (let m = 0; m < MAX_MATCHES; m++) {
@@ -36,8 +40,10 @@ function buildMatchGrid() {
     grid.appendChild(block);
 
     const slotRow = block.querySelector(`#slots-${m}`);
-    for (let s = 0; s < SLOTS_PER_MATCH; s++) {
-      slotRow.appendChild(createSlot(m, s));
+    if (slotRow) {
+      for (let s = 0; s < SLOTS_PER_MATCH; s++) {
+        slotRow.appendChild(createSlot(m, s));
+      }
     }
   }
 }
@@ -59,12 +65,16 @@ function createSlot(m, s) {
     <input type="file" id="file-${m}-${s}" accept="image/*">
   `;
 
-  wrapper.querySelector('input').addEventListener('change', (e) => handleFile(e, m, s));
+  const fileInput = wrapper.querySelector('input');
+  if (fileInput) {
+    fileInput.addEventListener('change', (e) => handleFile(e, m, s));
+  }
   return wrapper;
 }
 
 function triggerInput(m, s) {
-  document.getElementById(`file-${m}-${s}`).click();
+  const input = document.getElementById(`file-${m}-${s}`);
+  if (input) input.click();
 }
 
 // ============================================================
@@ -85,6 +95,7 @@ function handleFile(e, m, s) {
 
 function renderSlot(m, s) {
   const slot = document.getElementById(`slot-${m}-${s}`);
+  if (!slot) return;
   const data = matchData[m][s];
   const optLabel = s === 1 ? '<span class="slot-opt-badge">opsional</span>' : '';
 
@@ -98,13 +109,14 @@ function renderSlot(m, s) {
       ${optLabel}
       <input type="file" id="file-${m}-${s}" accept="image/*">
     `;
-    slot.querySelector('input').addEventListener('change', (e) => handleFile(e, m, s));
-    // re-assign click to trigger input (but not when clicking overlay)
+    const fileInput = slot.querySelector('input');
+    if (fileInput) {
+      fileInput.addEventListener('change', (e) => handleFile(e, m, s));
+    }
     slot.onclick = (e) => {
       if (!e.target.closest('.slot-overlay')) triggerInput(m, s);
     };
   } else {
-    // rebuild blank slot
     const newSlot = createSlot(m, s);
     slot.replaceWith(newSlot);
   }
@@ -113,10 +125,11 @@ function renderSlot(m, s) {
 function removeSlot(e, m, s) {
   e.stopPropagation();
   matchData[m][s] = null;
-  // reset file input by rebuilding
   const slot = document.getElementById(`slot-${m}-${s}`);
-  const newSlot = createSlot(m, s);
-  slot.replaceWith(newSlot);
+  if (slot) {
+    const newSlot = createSlot(m, s);
+    slot.replaceWith(newSlot);
+  }
   updateStatus();
 }
 
@@ -124,7 +137,6 @@ function removeSlot(e, m, s) {
 // STATUS
 // ============================================================
 function getActiveMatches() {
-  // A match is "active" if slot A (index 0) has a file
   return matchData
     .map((slots, idx) => ({ idx, slotA: slots[0], slotB: slots[1] }))
     .filter(m => m.slotA !== null);
@@ -132,9 +144,10 @@ function getActiveMatches() {
 
 function updateStatus() {
   const active = getActiveMatches().length;
-  document.getElementById('matchCountInfo').textContent =
-    `${active} match diupload (min. ${MIN_MATCHES})`;
-  document.getElementById('btnCalculate').disabled = active < MIN_MATCHES;
+  const countInfo = document.getElementById('matchCountInfo');
+  const btn = document.getElementById('btnCalculate');
+  if (countInfo) countInfo.textContent = `${active} match diupload (min. ${MIN_MATCHES})`;
+  if (btn) btn.disabled = active < MIN_MATCHES;
 }
 
 // ============================================================
@@ -142,17 +155,20 @@ function updateStatus() {
 // ============================================================
 function showToast(msg, dur = 5000) {
   const t = document.getElementById('toast');
+  if (!t) return;
   t.textContent = msg;
   t.classList.add('visible');
   setTimeout(() => t.classList.remove('visible'), dur);
 }
 
 function setStep(msg) {
-  document.getElementById('loadingStep').textContent = msg;
+  const step = document.getElementById('loadingStep');
+  if (step) step.textContent = msg;
 }
 
 function showLoading(show) {
-  document.getElementById('loadingOverlay').classList.toggle('active', show);
+  const overlay = document.getElementById('loadingOverlay');
+  if (overlay) overlay.classList.toggle('active', show);
 }
 
 // ============================================================
@@ -168,12 +184,11 @@ function toBase64(file) {
 }
 
 // ============================================================
-// API CALL PER MATCH - UDAH DIEDIT BUAT DEEPSEEK
+// API CALL PER MATCH - DEEPSEEK
 // ============================================================
 async function extractMatch(matchIdx, slotA, slotB, captains) {
   const capList = captains.join(', ');
 
-  // Build prompt for Deepseek
   const prompt = `Ini adalah screenshot hasil akhir Free Fire Match ${matchIdx + 1}.
 ${slotB ? 'Ada 2 gambar: sisi kiri dan sisi kanan layar hasil match.' : 'Ada 1 gambar hasil match.'}
 
@@ -194,10 +209,8 @@ CATATAN:
 Format wajib:
 {"match":${matchIdx + 1},"results":[{"captain":"nama","rank":angka,"kills":angka,"found":true_atau_false}]}`;
 
-  // Kirim gambar ke Deepseek pake format vision
   const contents = [];
   
-  // Tambahin gambar slot A
   const b64A = await toBase64(slotA.file);
   const mimeA = slotA.file.type || 'image/jpeg';
   contents.push({
@@ -205,7 +218,6 @@ Format wajib:
     image_url: { url: `data:${mimeA};base64,${b64A}` }
   });
   
-  // Tambahin gambar slot B kalo ada
   if (slotB) {
     const b64B = await toBase64(slotB.file);
     const mimeB = slotB.file.type || 'image/jpeg';
@@ -215,20 +227,14 @@ Format wajib:
     });
   }
   
-  // Tambahin teks prompt
   contents.push({ type: 'text', text: prompt });
 
-  const resp = await fetch('/api/deepseek', {  // <-- GANTI JADI DEEPSEEK
+  const resp = await fetch('/api/deepseek', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       model: 'deepseek-chat',
-      messages: [
-        {
-          role: 'user',
-          content: contents
-        }
-      ],
+      messages: [{ role: 'user', content: contents }],
       max_tokens: 1000
     })
   });
@@ -250,7 +256,7 @@ Format wajib:
 }
 
 // ============================================================
-// MAIN CALCULATE (GAK BERUBAH)
+// MAIN CALCULATE
 // ============================================================
 async function calculate() {
   const ftName = document.getElementById('ftName').value.trim();
@@ -284,7 +290,6 @@ async function calculate() {
     setStep('Menghitung total standing...');
     await new Promise(r => setTimeout(r, 400));
     buildStandings(captains, allResults, ftName, activeMatches.length);
-
   } catch (err) {
     console.error(err);
     showToast('Error: ' + err.message, 7000);
@@ -294,7 +299,7 @@ async function calculate() {
 }
 
 // ============================================================
-// BUILD STANDINGS (GAK BERUBAH)
+// BUILD STANDINGS
 // ============================================================
 function buildStandings(captains, allResults, ftName, matchCount) {
   const stats = {};
@@ -303,15 +308,17 @@ function buildStandings(captains, allResults, ftName, matchCount) {
   });
 
   allResults.forEach(matchResult => {
-    matchResult.results.forEach(r => {
-      const s = stats[r.captain];
-      if (!s) return;
-      const rp = RANK_POINTS[r.rank] || 0;
-      s.totalKills += r.kills;
-      s.stPoints += rp;
-      if (r.rank === 1) s.booyah++;
-      s.matches.push({ match: matchResult.match, rank: r.rank, kills: r.kills, found: r.found, rankPts: rp });
-    });
+    if (matchResult && matchResult.results) {
+      matchResult.results.forEach(r => {
+        const s = stats[r.captain];
+        if (!s) return;
+        const rp = RANK_POINTS[r.rank] || 0;
+        s.totalKills += r.kills;
+        s.stPoints += rp;
+        if (r.rank === 1) s.booyah++;
+        s.matches.push({ match: matchResult.match, rank: r.rank, kills: r.kills, found: r.found, rankPts: rp });
+      });
+    }
   });
 
   const rows = captains.map(cap => {
@@ -320,7 +327,6 @@ function buildStandings(captains, allResults, ftName, matchCount) {
     return s;
   });
 
-  // Sort descending: total poin tertinggi = juara 1
   rows.sort((a, b) => {
     if (b.totalPts !== a.totalPts) return b.totalPts - a.totalPts;
     if (b.booyah !== a.booyah) return b.booyah - a.booyah;
@@ -331,10 +337,11 @@ function buildStandings(captains, allResults, ftName, matchCount) {
 }
 
 // ============================================================
-// RENDER RESULT (GAK BERUBAH)
+// RENDER RESULT
 // ============================================================
 function renderStandings(rows, ftName, matchCount, allResults) {
   const tbody = document.getElementById('standingsBody');
+  if (!tbody) return;
   tbody.innerHTML = '';
   const trophies = ['🥇', '🥈', '🥉'];
 
@@ -343,28 +350,32 @@ function renderStandings(rows, ftName, matchCount, allResults) {
     const tr = document.createElement('tr');
     tr.className = `table-row ${rank <= 3 ? 'rank-' + rank : ''}`;
     tr.innerHTML = `
-      <td>${String(rank).padStart(2, '0')}</td>
-      <td>${esc(row.captain)}</td>
-      <td class="num-cell">${row.booyah}</td>
-      <td class="num-cell">${row.totalKills}</td>
-      <td class="num-cell">${row.stPoints}</td>
-      <td class="total-pts">${row.totalPts}</td>
-      <td>${rank <= 3 ? '<span class="trophy">' + trophies[rank - 1] + '</span>' : ''}</td>
+      <td style="text-align:center">${String(rank).padStart(2, '0')}</td>
+      <td style="text-align:left">${esc(row.captain)}</td>
+      <td class="num-cell" style="text-align:center">${row.booyah}</td>
+      <td class="num-cell" style="text-align:center">${row.totalKills}</td>
+      <td class="num-cell" style="text-align:center">${row.stPoints}</td>
+      <td class="total-pts" style="text-align:center">${row.totalPts}</td>
+      <td style="text-align:center">${rank <= 3 ? '<span class="trophy">' + trophies[rank - 1] + '</span>' : ''}</td>
     `;
     tbody.appendChild(tr);
   });
 
   buildBreakdown(rows, matchCount);
 
-  document.getElementById('ftCreditName').textContent = ftName;
-  document.getElementById('formSection').style.display = 'none';
-  document.getElementById('resultSection').classList.add('visible');
+  const ftCredit = document.getElementById('ftCreditName');
+  if (ftCredit) ftCredit.textContent = ftName;
+  const formSection = document.getElementById('formSection');
+  const resultSection = document.getElementById('resultSection');
+  if (formSection) formSection.style.display = 'none';
+  if (resultSection) resultSection.classList.add('visible');
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 function buildBreakdown(rows, matchCount) {
   const table = document.getElementById('breakdownTable');
-  let html = '<tr><th>Kapten</th>';
+  if (!table) return;
+  let html = '<table class="breakdown-table"><tr><th>Kapten</th>';
   for (let m = 0; m < matchCount; m++) {
     html += `<th colspan="3">Match ${m + 1}</th>`;
   }
@@ -380,44 +391,53 @@ function buildBreakdown(rows, matchCount) {
     for (let m = 0; m < matchCount; m++) {
       const md = row.matches.find(x => x.match === m + 1);
       if (md && md.found) {
-        html += `<td style="color:#7aabff;">#${md.rank}</td><td style="color:#7aabff;">${md.kills}</td><td style="color:#FFD700;">${md.rankPts + md.kills}</td>`;
+        html += `<td style="color:#7aabff;text-align:center">#${md.rank}</td><td style="color:#7aabff;text-align:center">${md.kills}</td><td style="color:#FFD700;text-align:center">${md.rankPts + md.kills}</td>`;
       } else {
-        html += `<td style="color:#333;">-</td><td style="color:#333;">-</td><td style="color:#333;">0</td>`;
+        html += `<td style="color:#333;text-align:center">-</td><td style="color:#333;text-align:center">-</td><td style="color:#333;text-align:center">0</td>`;
       }
     }
-    html += `<td style="color:#FFD700;font-weight:700;">${row.totalPts}</td></tr>`;
+    html += `<td style="color:#FFD700;font-weight:700;text-align:center">${row.totalPts}</td></tr>`;
   });
-
+  html += '</table>';
   table.innerHTML = html;
 }
 
 function toggleBreakdown() {
   const wrap = document.getElementById('breakdownWrap');
+  if (!wrap) return;
   wrap.classList.toggle('visible');
-  document.querySelector('.btn-toggle').textContent =
-    wrap.classList.contains('visible') ? 'Sembunyikan Detail ▴' : 'Detail Per Match ▾';
+  const btn = document.querySelector('.btn-toggle');
+  if (btn) btn.textContent = wrap.classList.contains('visible') ? 'Sembunyikan Detail ▴' : 'Detail Per Match ▾';
 }
 
 function resetAll() {
   for (let m = 0; m < MAX_MATCHES; m++) {
     matchData[m] = [null, null];
   }
-  document.getElementById('ftName').value = '';
-  document.getElementById('captainNames').value = '';
-  document.getElementById('breakdownWrap').classList.remove('visible');
-  document.getElementById('resultSection').classList.remove('visible');
-  document.getElementById('formSection').style.display = 'block';
+  const ftName = document.getElementById('ftName');
+  const captainNames = document.getElementById('captainNames');
+  if (ftName) ftName.value = '';
+  if (captainNames) captainNames.value = '';
+  const breakdownWrap = document.getElementById('breakdownWrap');
+  if (breakdownWrap) breakdownWrap.classList.remove('visible');
+  const resultSection = document.getElementById('resultSection');
+  const formSection = document.getElementById('formSection');
+  if (resultSection) resultSection.classList.remove('visible');
+  if (formSection) formSection.style.display = 'block';
   buildMatchGrid();
   updateStatus();
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 function esc(s) {
+  if (!s) return '';
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
 // ============================================================
-// INIT
+// INIT - PASTIKAN DOM UDH SIAP
 // ============================================================
-buildMatchGrid();
-updateStatus();
+document.addEventListener('DOMContentLoaded', function() {
+  buildMatchGrid();
+  updateStatus();
+});
