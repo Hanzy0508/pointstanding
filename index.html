@@ -1,104 +1,144 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>FF Tournament Standing Calculator</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Orbitron:wght@400;700;900&family=Exo+2:wght@300;400;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FF Tournament Standing Calculator</title>
+    <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-
-<div class="container">
-  <div class="header">
-    <div class="header-title">Tournament Standing</div>
-    <div class="header-sub">Free Fire &nbsp;·&nbsp; Auto Calculator</div>
-  </div>
-
-  <!-- FORM -->
-  <div class="form-section" id="formSection">
-
-    <div class="section-label">Info Turnamen</div>
-    <div class="input-row">
-      <div class="input-group">
-        <span class="input-label">Nama FT</span>
-        <input type="text" id="ftName" placeholder="Contoh: FAST TOUR Season 1">
-      </div>
-      <div class="input-group">
-        <span class="input-label">Nama Kapten (pisah baris / koma)</span>
-        <textarea id="captainNames" placeholder="Contoh:&#10;adem men&#10;INI WIN&#10;MLG AL"></textarea>
-      </div>
-    </div>
-
-    <div class="section-label" style="margin-top:20px;">Upload Foto Hasil Match</div>
-    <p class="upload-hint">
-      Match 1–3 <strong style="color:#7aabff;">wajib</strong> &nbsp;·&nbsp; Match 4–6 <span style="color:#5a6a8a;">opsional</span>
-      <br>Setiap match bisa upload <strong style="color:#7aabff;">2 foto</strong> (kiri & kanan layar hasil FF)
-    </p>
-
-    <div id="matchGrid" class="match-outer-grid"></div>
-    <div class="match-count-info" id="matchCountInfo">0 match diupload (min. 3)</div>
-
-    <button class="btn-calculate" id="btnCalculate" onclick="calculate()" disabled>
-      ⚡ &nbsp; Hitung Standing
-    </button>
-  </div>
-
-  <!-- RESULT -->
-  <div class="result-section" id="resultSection">
-    <div class="result-card">
-      <div class="result-title">
-        <h2>Overall</h2>
-        <h3>Standings</h3>
-      </div>
-
-      <div class="table-wrap">
-        <table class="standings-table">
-          <thead>
-            <tr>
-              <th>No.</th>
-              <th style="text-align:left">Team Name</th>
-              <th>Booyah</th>
-              <th>Kills</th>
-              <th>ST Points</th>
-              <th>Total Pts</th>
-              <th>Juara</th>
-            </tr>
-          </thead>
-          <tbody id="standingsBody"></tbody>
-        </table>
-      </div>
-
-      <div class="breakdown-toggle">
-        <button class="btn-toggle" onclick="toggleBreakdown()">Detail Per Match ▾</button>
-      </div>
-      <div class="breakdown-wrap" id="breakdownWrap">
-        <div class="breakdown-scroll">
-          <table id="breakdownTable"></table>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1>🔥 FF TOURNAMENT STANDINGS 🔥</h1>
+            <p class="subtitle">Powered by AI Scan | DeepSeek Vision</p>
         </div>
-      </div>
 
-      <div class="ft-credit">
-        <span>FT by &nbsp;</span><strong id="ftCreditName">—</strong>
-      </div>
+        <!-- Input Form -->
+        <div class="form-card">
+            <h2>⚙️ Tournament Setup</h2>
+            
+            <div class="input-group">
+                <label>🏢 Nama FT (Penyelenggara)</label>
+                <input type="text" id="ftName" placeholder="Ex: EVOS Esports">
+            </div>
+
+            <div class="input-group">
+                <label>👥 Nama Kapten Tim (pisah koma atau baris)</label>
+                <textarea id="captains" rows="3" placeholder="RRQ Albert, AE Xinnn, ONIC Kairi, ..."></textarea>
+            </div>
+
+            <!-- Match 1 -->
+            <div class="match-card">
+                <h3>📸 MATCH 1 <span class="required">(Wajib)</span></h3>
+                <div class="photo-upload">
+                    <div class="photo-field">
+                        <label>Foto Kiri (Rank & Kill Kiri)</label>
+                        <input type="file" accept="image/*" class="match-left" data-match="1">
+                    </div>
+                    <div class="photo-field">
+                        <label>Foto Kanan (Rank & Kill Kanan)</label>
+                        <input type="file" accept="image/*" class="match-right" data-match="1">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Match 2 -->
+            <div class="match-card">
+                <h3>📸 MATCH 2 <span class="required">(Wajib)</span></h3>
+                <div class="photo-upload">
+                    <div class="photo-field">
+                        <label>Foto Kiri</label>
+                        <input type="file" accept="image/*" class="match-left" data-match="2">
+                    </div>
+                    <div class="photo-field">
+                        <label>Foto Kanan</label>
+                        <input type="file" accept="image/*" class="match-right" data-match="2">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Match 3 -->
+            <div class="match-card">
+                <h3>📸 MATCH 3 <span class="required">(Wajib)</span></h3>
+                <div class="photo-upload">
+                    <div class="photo-field">
+                        <label>Foto Kiri</label>
+                        <input type="file" accept="image/*" class="match-left" data-match="3">
+                    </div>
+                    <div class="photo-field">
+                        <label>Foto Kanan</label>
+                        <input type="file" accept="image/*" class="match-right" data-match="3">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Match 4-6 (Opsional) -->
+            <div class="match-card optional">
+                <h3>📸 MATCH 4 <span class="optional-badge">(Opsional)</span></h3>
+                <div class="photo-upload">
+                    <div class="photo-field">
+                        <input type="file" accept="image/*" class="match-left" data-match="4">
+                    </div>
+                    <div class="photo-field">
+                        <input type="file" accept="image/*" class="match-right" data-match="4">
+                    </div>
+                </div>
+            </div>
+
+            <div class="match-card optional">
+                <h3>📸 MATCH 5 <span class="optional-badge">(Opsional)</span></h3>
+                <div class="photo-upload">
+                    <div class="photo-field">
+                        <input type="file" accept="image/*" class="match-left" data-match="5">
+                    </div>
+                    <div class="photo-field">
+                        <input type="file" accept="image/*" class="match-right" data-match="5">
+                    </div>
+                </div>
+            </div>
+
+            <div class="match-card optional">
+                <h3>📸 MATCH 6 <span class="optional-badge">(Opsional)</span></h3>
+                <div class="photo-upload">
+                    <div class="photo-field">
+                        <input type="file" accept="image/*" class="match-left" data-match="6">
+                    </div>
+                    <div class="photo-field">
+                        <input type="file" accept="image/*" class="match-right" data-match="6">
+                    </div>
+                </div>
+            </div>
+
+            <button id="calculateBtn" class="btn-primary">🚀 HITUNG STANDINGS 🚀</button>
+        </div>
+
+        <!-- Loading -->
+        <div id="loading" class="loading hidden">
+            <div class="spinner"></div>
+            <p>AI sedang scan foto-foto...</p>
+        </div>
+
+        <!-- Results -->
+        <div id="results" class="results hidden">
+            <div class="standings-header">
+                <h2>🏆 FINAL STANDINGS 🏆</h2>
+                <div id="ftDisplay" class="ft-display"></div>
+            </div>
+            <div id="standingsTable"></div>
+            <button id="showBreakdownBtn" class="btn-secondary">📊 DETAIL BREAKDOWN</button>
+        </div>
+
+        <!-- Breakdown Modal -->
+        <div id="breakdownModal" class="modal hidden">
+            <div class="modal-content">
+                <span class="close">&times;</span>
+                <h2>📋 Match Breakdown</h2>
+                <div id="breakdownContent"></div>
+            </div>
+        </div>
     </div>
 
-    <button class="btn-reset" onclick="resetAll()">↺ &nbsp; Hitung Ulang / Reset</button>
-  </div>
-</div>
-
-<!-- LOADING -->
-<div class="loading-overlay" id="loadingOverlay">
-  <div class="loader-ring"></div>
-  <div class="loading-text">Memproses Data</div>
-  <div class="loading-step" id="loadingStep">Mempersiapkan foto...</div>
-</div>
-
-<!-- TOAST -->
-<div class="toast" id="toast"></div>
-
-<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
-<script src="app.js"></script>
+    <script src="script.js"></script>
 </body>
 </html>
